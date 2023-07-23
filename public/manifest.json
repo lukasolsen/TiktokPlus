@@ -1,14 +1,20 @@
 {
-	"name": "Orange It Up!",
-	"description": "This extension is created for changing the background color of the page orange.",
-	"version": "1.0",
-	"manifest_version": 3,
-	"action": {},
-	"permissions": [
-		"activeTab",
-		"scripting"
-	],
-	"background": {
-		"service_worker": "background.js"
-	}
+  "name": "Tiktok+",
+  "icons": {
+    "128": "logo/logo.png"
+  },
+  "description": "Tiktok+ is a simple yet powerful Chrome extension designed to enhance your Tiktok journey by resolving common navigation issues and improving overall usability. Seamlessly integrated with Tiktok’s platform, this extension focuses on delivering a smoother and more enjoyable user experience without altering the core essence of the Tiktok app.",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "action": {},
+  "permissions": ["activeTab", "scripting", "webNavigation", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.tiktok.com/*"],
+      "js": ["content.js"]
+    }
+  ]
 }
