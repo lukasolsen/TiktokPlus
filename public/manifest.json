@@ -1,6 +1,8 @@
 {
   "name": "Tiktok+",
   "icons": {
+    "16": "logo/logo.png",
+    "48": "logo/logo.png",
     "128": "logo/logo.png"
   },
   "description": "Tiktok+ is a simple yet powerful Chrome extension designed to enhance your Tiktok journey by resolving common navigation issues and improving overall usability. Seamlessly integrated with Tiktok’s platform, this extension focuses on delivering a smoother and more enjoyable user experience without altering the core essence of the Tiktok app.",
@@ -14,7 +16,8 @@
   "content_scripts": [
     {
       "matches": ["https://www.tiktok.com/*"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "css": ["styles/global.css"]
     }
   ]
 }

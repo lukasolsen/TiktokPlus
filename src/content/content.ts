@@ -1,5 +1,7 @@
-// content.js
 let port = null;
+import axios from "axios";
+import cheerio from "cheerio";
+import qs from "qs";
 
 function setupConnection() {
   port = chrome.runtime.connect({ name: "tiktokConnection" });
@@ -17,15 +19,15 @@ class TiktokAutoScroller {
   private video: HTMLVideoElement | null;
   private videosWithListeners: HTMLVideoElement[];
   private nextButton: HTMLButtonElement | null;
-  private observer: MutationObserver | null;
   static instance: TiktokAutoScroller;
+  private enabled: boolean;
 
   constructor() {
+    this.enabled = false;
     this.video = document.querySelector("video") as HTMLVideoElement;
     this.videosWithListeners = [];
     console.log("Video found", this.video);
     this.nextButton = null;
-    this.observer = null;
   }
 
   public static getInstance(): TiktokAutoScroller {
@@ -72,6 +74,10 @@ class TiktokAutoScroller {
         console.log("Video already has a listener");
         return;
       }
+      if (!this.enabled) {
+        console.log("Auto scroller is not enabled");
+        return;
+      }
       this.videosWithListeners.push(this.video);
       console.log(this.videosWithListeners);
       this.video.addEventListener("ended", this.handleVideoEnded.bind(this));
@@ -79,6 +85,9 @@ class TiktokAutoScroller {
   }
 
   private handleVideoEnded(): void {
+    if (!this.enabled) {
+      return;
+    }
     if (this.nextButton && this.nextButton.disabled) {
       console.log("No more videos to watch");
       return;
@@ -91,59 +100,52 @@ class TiktokAutoScroller {
     }
   }
 
-  private handleDOMChanges(mutationsList: MutationRecord[] | any): void {
-    /*for (const mutation of mutationsList) {
-      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        const newVideoPlayer = mutation.addedNodes[0] as HTMLVideoElement;
-        console.log("New video player added", newVideoPlayer.classList);
-        if (newVideoPlayer.classList.contains("DivBasicPlayerWrapper")) {
-          newVideoPlayer.addEventListener(
-            "ended",
-            this.handleVideoEnded.bind(this)
-          );
-          break;
-        }
-      }
-    }*/
-    if (document.querySelector("video") === this.video) {
+  private handleDOMChanges(
+    mutationList: MutationRecord[],
+    autoScroller: TiktokAutoScroller
+  ): void {
+    console.log("DOM changed");
+    if (document.querySelector("video") === autoScroller.video) {
       return;
     }
-    this.video = document.querySelector("video") as HTMLVideoElement;
-    this.findNextButton();
-    this.handleVideoListener();
-  }
-
-  private observeDOMChanges(): void {
-    if (!this.observer) {
-      this.observer = new MutationObserver(this.handleDOMChanges.bind(this));
-    }
-
-    const targetNode = document.getElementById("app") as HTMLElement;
-    const config = { childList: true, subtree: true };
-    this.observer.observe(targetNode, config);
+    autoScroller.video = document.querySelector("video") as HTMLVideoElement;
+    autoScroller.findNextButton();
+    autoScroller.handleVideoListener();
   }
 
   public start(): void {
+    if (this.enabled) {
+      return;
+    }
+    this.enabled = true;
+
+    DocumentHandler.getInstance().addFunctionForListening(
+      "autoScroller",
+      this.handleDOMChanges,
+      [this] // Pass TiktokAutoScroller instance as an additional argument
+    );
+
     this.findNextButton();
-    this.observeDOMChanges();
     this.handleVideoListener();
   }
 
   public stop(): void {
-    if (this.observer) {
-      this.observer.disconnect();
-      this.observer = null;
-    }
-    this.observer = null;
+    if (this.enabled) {
+      this.enabled = false;
 
-    for (const video of this.videosWithListeners) {
-      video.removeEventListener("ended", this.handleVideoEnded.bind(this));
+      for (const video of this.videosWithListeners) {
+        if (video) {
+          video.removeEventListener("ended", this.handleVideoEnded.bind(this));
+        }
+      }
+      this.videosWithListeners = [];
+
+      DocumentHandler.getInstance().removeFunctionForListening("autoScroller");
     }
-    this.videosWithListeners = [];
   }
 
   public toggle(): void {
-    if (this.observer) {
+    if (this.enabled) {
       this.stop();
     } else {
       this.start();
@@ -151,249 +153,216 @@ class TiktokAutoScroller {
   }
 }
 
+class HideComments {
+  static instance: HideComments;
+
+  private enabled: boolean;
+  private commentDivClass: string[];
+
+  constructor() {
+    this.enabled = false;
+    this.commentDivClass = [
+      ".tiktok-1r61p2t-DivContentContainer",
+      ".tiktok-x4xlc7-DivCommentContainer",
+    ];
+  }
+
+  public static getInstance(): HideComments {
+    if (!this.instance) {
+      this.instance = new HideComments();
+    }
+    return this.instance;
+  }
+
+  private handleDOMChanges(
+    mutationList: MutationRecord[],
+    hideComments: HideComments
+  ): void {
+    hideComments.commentDivClass.forEach((commentDivClass) => {
+      hideComments.toggleVisibility(commentDivClass);
+    });
+  }
+
+  public start(): void {
+    if (this.enabled) {
+      return;
+    }
+    this.enabled = true;
+    DocumentHandler.getInstance().addFunctionForListening(
+      "hideComments",
+      this.handleDOMChanges,
+      [this]
+    );
+
+    this.commentDivClass.forEach((commentDivClass) => {
+      this.toggleVisibility(commentDivClass);
+    });
+  }
+
+  private toggleVisibility(commentDivClass): void {
+    const comments = document.querySelector(commentDivClass) as HTMLElement;
+    if (comments && comments.style.display !== "none" && this.enabled) {
+      comments.style.display = "none";
+    } else if (comments && comments.style.display === "none" && !this.enabled) {
+      comments.style.display = "block";
+    }
+  }
+
+  public stop(): void {
+    if (this.enabled) {
+      this.enabled = false;
+
+      DocumentHandler.getInstance().removeFunctionForListening("hideComments");
+      this.commentDivClass.forEach((commentDivClass) => {
+        this.toggleVisibility(commentDivClass);
+      });
+    }
+  }
+
+  public toggle(): void {
+    if (this.enabled) {
+      this.stop();
+    } else {
+      this.start();
+    }
+  }
+}
+
+class TikTokDownload {
+  static instance: TikTokDownload;
+
+  constructor() {}
+
+  public static getInstance(): TikTokDownload {
+    if (!this.instance) {
+      this.instance = new TikTokDownload();
+    }
+    return this.instance;
+  }
+
+  public download(url: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      axios
+        .get("https://ttdownloader.com/")
+        .then((data) => {
+          const $ = cheerio.load(data.data);
+          const cookie = data.headers["set-cookie"].join("");
+          const dataPost = {
+            url: url,
+            format: "",
+            token: $("#token").attr("value"),
+          };
+          // return console.log(cookie);
+          axios({
+            method: "POST",
+            url: "https://ttdownloader.com/req/",
+            headers: {
+              "content-type":
+                "application/x-www-form-urlencoded; charset=UTF-8",
+              origin: "https://ttdownloader.com",
+              referer: "https://ttdownloader.com/",
+              cookie: cookie,
+            },
+            data: qs.stringify(dataPost),
+          })
+            .then(({ data }) => {
+              const $ = cheerio.load(data);
+              const result = {
+                nowm: $(
+                  "#results-list > div:nth-child(2) > div.download > a"
+                )?.attr("href"),
+                wm: $(
+                  "#results-list > div:nth-child(3) > div.download > a"
+                )?.attr("href"),
+                audio: $(
+                  "#results-list > div:nth-child(4) > div.download > a"
+                ).attr("href"),
+              };
+              resolve(result);
+            })
+            .catch((e) => {
+              reject({
+                status: false,
+                message: "error fetch data",
+                e: e.message,
+              });
+            });
+        })
+        .catch((e) => {
+          reject({ status: false, message: "error fetch data", e: e.message });
+        });
+    });
+  }
+}
+
+/**
+ * Acts like a helper class which helps other classes checking for changes in the DOM
+ */
+class DocumentHandler {
+  static instance: DocumentHandler;
+  private observer: MutationObserver;
+  private functionsForListening: {
+    name: string;
+    func: Function;
+    args?: any[];
+  }[];
+
+  constructor() {
+    this.functionsForListening = [];
+    this.observer = new MutationObserver(this.handleDOMChanges.bind(this));
+  }
+
+  public static getInstance(): DocumentHandler {
+    if (!DocumentHandler.instance) {
+      DocumentHandler.instance = new DocumentHandler();
+    }
+    return DocumentHandler.instance;
+  }
+
+  public handleDOMChanges(mutationList: MutationRecord[]): void {
+    console.log("DOM changed", this.functionsForListening);
+    // for each function we have in functionsForListening, call it
+    for (const funcObj of this.functionsForListening) {
+      funcObj.func(mutationList, ...(funcObj.args || []));
+    }
+  }
+
+  public listenForDocumentChanges(): void {
+    const targetNode = document.getElementById("app") as HTMLElement;
+    const config = { childList: true, subtree: true };
+    this.observer.observe(targetNode, config);
+  }
+
+  public addFunctionForListening(
+    name: string,
+    func: Function,
+    args?: any[]
+  ): void {
+    this.functionsForListening.push({ name, func, args });
+  }
+
+  public removeFunctionForListening(name: string): void {
+    const index = this.functionsForListening.findIndex((f) => f.name === name);
+    if (index !== -1) {
+      this.functionsForListening.splice(index, 1);
+    }
+  }
+
+  public start(): void {
+    this.listenForDocumentChanges();
+  }
+
+  public stop(): void {
+    this.observer.disconnect();
+    this.observer = null;
+  }
+}
+
 class AppendDOMElements {
   private observer: MutationObserver;
 
   constructor() {
-    this.appendStyles();
     //this.observer = new MutationObserver(this.appendElements.bind(this));
-  }
-
-  private getCookieValue(cookieName): string | null {
-    const cookies = document.cookie.split(";");
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split("=");
-      if (name === cookieName) {
-        return value;
-      }
-    }
-    return null; // Return null if the cookie is not found
-  }
-
-  private appendStyles(): void {
-    console.log(this.getCookieValue("tiktok_webapp_theme"));
-
-    //example style, make a new class for the auto scroller button
-    const style = document.createElement("style");
-    style.setAttribute("data-e2e", "auto-scroller-style");
-
-    style.innerHTML = `
-    
-    
-    .tiktokplus-list {
-      margin-top: 8px;
-      margin-bottom: 8px;
-      padding: 16px 0;
-      position: relative;
-      leter-spacing: 0.093px;
-    }
-
-    .tiktokplus-list::before {
-      content: "";
-      position: absolute;
-      left: 8px;
-      right: 8px;
-      top: 0;
-      height: 1px;
-      background: var(--hr-color);
-      -webkit-transform: scaleY(0.5);
-      -moz-transform: scaleY(0.5);
-      -ms-transform: scaleY(0.5);
-      transform: scaleY(0.5);
-    }
-
-    .listItemWrapper-TIKTOKPLUS {
-      display: flex;
-      white-space: nowrap;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      font-weight: 700;
-    }
-
-    .divItem-TIKTOKPLUS {
-      align-items: center;
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      align-content: center;
-      width: 60%;
-      justify-content: space-between;
-    }
-
-    .auto-scroller-div {
-      display: flex;
-      white-space: nowrap;
-      flex-direction: row;
-      width: 100%;
-      -webkit-box-align: center;
-      align-items: center;
-      color: rgba(255, 255, 255, 0.9);
-    }
-    .ButtonSwitchContainer {
-      font-size: 16px;
-      line-height: 21px;
-      letter-spacing: 0.03px;
-      border: none;
-      background: none;
-      outline: none;
-      padding: 0px;
-      position: relative;
-      overflow: visible;
-      display: inline-flex;
-      -webkit-box-align: center;
-      align-items: center;
-      color: rgba(255, 255, 255, 0.9);
-      font-family: TikTokFont, Arial, Tahoma, PingFangSC, sans-serif;
-      cursor: pointer;
-    }
-
-    .ButtonSwitchDiv-Active {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      left: 0px;
-      top: 0px;
-      background: rgb(11, 224, 155);
-      border-radius: 100px;
-      transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
-    }
-
-    .ButtonSwitchDiv {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      left: 0px;
-      top: 0px;
-      background: rgba(22, 24, 35, 0.12);
-      border-radius: 100px;
-      transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
-    }
-
-    .ButtonSwitchIcon-Active {
-      position: absolute;
-      display: flex;
-      -webkit-box-pack: center;
-      justify-content: center;
-      -webkit-box-align: center;
-      align-items: center;
-      width: 20px;
-      height: 20px;
-      left: calc(100% - 2px);
-      top: 50%;
-      transform: translate(-100%, -50%);
-      border-radius: 100px;
-      background: rgb(255, 255, 255);
-      box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 2px;
-      transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
-    }
-
-    .ButtonSwitchIcon {
-      position: absolute;
-      display: flex;
-      -webkit-box-pack: center;
-      justify-content: center;
-      -webkit-box-align: center;
-      align-items: center;
-      width: 20px;
-      height: 20px;
-      left: 2px;
-      top: 50%;
-      transform: translateY(-50%);
-      border-radius: 100px;
-      background: rgb(255, 255, 255);
-      box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 2px;
-      transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
-    }
-
-    .divSettingItem-TIKTOKPLUS {
-      display: flex;
-      white-space: nowrap;
-      flex-direction: row;
-      width: 100%;
-      -webkit-box-align: center;
-      align-items: center;
-      color: rgb(22, 24, 35);
-    }
-
-      html {
-        /** CSS DARK THEME PRIMARY COLORS */
-        --color-primary-100: #121212;
-        --color-primary-200: #282828;
-        --color-primary-300: #3f3f3f;
-        --color-primary-400: #575757;
-        --color-primary-500: #717171;
-        --color-primary-600: #8b8b8b;
-        /** CSS DARK THEME SURFACE COLORS */
-        --color-surface-100: #c9c9c9;
-        --color-surface-200: #cfcfcf;
-        --color-surface-300: #d5d5d5;
-        --color-surface-400: #dbdbdb;
-        --color-surface-500: #e1e1e1;
-        --color-surface-600: #e7e7e7;
-        /** CSS DARK THEME MIXED SURFACE COLORS */
-        --color-surface-mixed-100: #b4b4b4;
-        --color-surface-mixed-200: #bcbcbc;
-        --color-surface-mixed-300: #c4c4c4;
-        --color-surface-mixed-400: #cccccc;
-        --color-surface-mixed-500: #d5d5d5;
-        --color-surface-mixed-600: #dddddd;
-
-        --hr-color: #e1e1e1;
-      }
-
-      html[data-theme='dark'] {
-        /** CSS DARK THEME PRIMARY COLORS */
-        --color-primary-100: #ffffff;
-        --color-primary-200: #dddddd;
-        --color-primary-300: #cfcccc;
-        --color-primary-400: #d6d6d6;
-        --color-primary-500: #c9c9c9;
-        --color-primary-600: #c2c2c2;
-        /** CSS DARK THEME SURFACE COLORS */
-        --color-surface-100: #121212;
-        --color-surface-200: #282828;
-        --color-surface-300: #3f3f3f;
-        --color-surface-400: #575757;
-        --color-surface-500: #717171;
-        --color-surface-600: #8b8b8b;
-        /** CSS DARK THEME MIXED SURFACE COLORS */
-        --color-surface-mixed-100: #252525;
-        --color-surface-mixed-200: #393939;
-        --color-surface-mixed-300: #4f4f4f;
-        --color-surface-mixed-400: #666666;
-        --color-surface-mixed-500: #7d7d7d;
-        --color-surface-mixed-600: #969696;
-        
-        --hr-color: #3f3f3f;
-      }
-
-      span {
-        color: var(--color-primary-100) !important;
-      }
-
-      h1 {
-        color: var(--color-primary-100) !important;
-      }
-
-      h2 {
-        color: var(--color-primary-300) !important;
-      }
-
-      h3 {
-        color: var(--color-primary-100) !important;
-      }
-
-      h4 {
-        color: var(--color-primary-200) !important;
-      }
-      
-    `;
-
-    document.head.appendChild(style);
   }
 
   private appendElements(): void {
@@ -411,6 +380,7 @@ class AppendDOMElements {
     <h2 class="tiktok-d9vq6u-H2Title">TikTok Plus</h2>
 
     <ul class="tiktok-nwhccz-UlMainNav auto-scroller" role="option">
+      
       <li class="listItemWrapper-TIKTOKPLUS">
         <div class="divItem-TIKTOKPLUS">
           <svg xmlns="http://www.w3.org/2000/svg" height="1.5em" viewBox="0 0 256 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><style>svg{fill:var(--color-primary-100)}</style><path d="M145.6 7.7C141 2.8 134.7 0 128 0s-13 2.8-17.6 7.7l-104 112c-6.5 7-8.2 17.2-4.4 25.9S14.5 160 24 160H80V352H24c-9.5 0-18.2 5.7-22 14.4s-2.1 18.9 4.4 25.9l104 112c4.5 4.9 10.9 7.7 17.6 7.7s13-2.8 17.6-7.7l104-112c6.5-7 8.2-17.2 4.4-25.9s-12.5-14.4-22-14.4H176V160h56c9.5 0 18.2-5.7 22-14.4s2.1-18.9-4.4-25.9l-104-112z"/></svg>
@@ -422,6 +392,27 @@ class AppendDOMElements {
           </div>
         </button>
       </li>
+
+      <li class="listItemWrapper-TIKTOKPLUS">
+        <div class="divItem-TIKTOKPLUS">
+          <svg xmlns="http://www.w3.org/2000/svg" height="1.5em" viewBox="0 0 256 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><style>svg{fill:var(--color-primary-100)}</style><path d="M145.6 7.7C141 2.8 134.7 0 128 0s-13 2.8-17.6 7.7l-104 112c-6.5 7-8.2 17.2-4.4 25.9S14.5 160 24 160H80V352H24c-9.5 0-18.2 5.7-22 14.4s-2.1 18.9 4.4 25.9l104 112c4.5 4.9 10.9 7.7 17.6 7.7s13-2.8 17.6-7.7l104-112c6.5-7 8.2-17.2 4.4-25.9s-12.5-14.4-22-14.4H176V160h56c9.5 0 18.2-5.7 22-14.4s2.1-18.9-4.4-25.9l-104-112z"/></svg>
+          <span>Hide Comments</span>
+        </div>
+        <button type="button" role="switch" aria-checked="false" id="view-comments" aria-label="Hide Comments" class="ButtonSwitchContainer">
+          <div width="44px" height="24px" class="ButtonSwitchDiv">
+            <span width="20px" height="20px" class="ButtonSwitchIcon"></span>
+          </div>
+        </button>
+      </li>
+
+      <li class="listItemWrapper-TIKTOKPLUS">
+      
+        <button class="buttonItem-TIKTOKPLUS" type="button" role="button" id="download-tiktokplus" aria-label="Download">
+        <svg xmlns="http://www.w3.org/2000/svg" height="1.5em" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H346.5l-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352H64zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z"/></svg>
+          <span>Download</span>
+        </div>
+      </li>
+
     </ul>
     `;
 
@@ -438,6 +429,33 @@ class AppendDOMElements {
     autoScrollerEl.addEventListener("click", () => {
       TiktokAutoScroller.getInstance().toggle();
       this.runSwitchAnimation(autoScrollerEl);
+    });
+
+    const viewCommentsEl = document.getElementById("view-comments");
+    viewCommentsEl.addEventListener("click", () => {
+      this.runSwitchAnimation(viewCommentsEl);
+      //TODO: add functionality
+      HideComments.getInstance().toggle();
+
+      //ex class: tiktok-1r61p2t-DivContentContainer e1mecfx00
+    });
+
+    const downloadEl = document.getElementById("download-tiktokplus");
+    downloadEl.addEventListener("click", () => {
+      const videoUrl = new URL(window.location.href);
+      const videoId = videoUrl.pathname.split("/video/")[1];
+      if (!videoId) {
+        return;
+      }
+      TikTokDownload.getInstance()
+        .download(videoUrl.href)
+        .then((data) => {
+          console.log(data);
+          window.open(data.nowm, "_blank");
+        })
+        .catch((e) => {
+          console.log(e);
+        });
     });
   }
 
@@ -472,6 +490,7 @@ class AppendDOMElements {
 
 window.addEventListener("load", () => {
   console.log("Tiktok Auto Scroller loaded");
+  DocumentHandler.getInstance().start();
 
   const appendDOMElements = new AppendDOMElements();
   appendDOMElements.start();

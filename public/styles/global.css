@@ -1,0 +1,239 @@
+.tiktokplus-list {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 16px 0;
+  position: relative;
+  leter-spacing: 0.093px;
+}
+
+.tiktokplus-list::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 0;
+  height: 1px;
+  background: var(--hr-color);
+  -webkit-transform: scaleY(0.5);
+  -moz-transform: scaleY(0.5);
+  -ms-transform: scaleY(0.5);
+  transform: scaleY(0.5);
+}
+
+.listItemWrapper-TIKTOKPLUS {
+  display: flex;
+  white-space: nowrap;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.divItem-TIKTOKPLUS {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-content: center;
+  width: 60%;
+  justify-content: space-between;
+}
+
+.buttonItem-TIKTOKPLUS {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-content: center;
+  width: 100%;
+  justify-content: flex-start;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  outline: none;
+  padding: 8px;
+}
+
+.buttonItem-TIKTOKPLUS > svg {
+  margin-right: 8px;
+}
+
+.auto-scroller-div {
+  display: flex;
+  white-space: nowrap;
+  flex-direction: row;
+  width: 100%;
+  -webkit-box-align: center;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+.ButtonSwitchContainer {
+  font-size: 16px;
+  line-height: 21px;
+  letter-spacing: 0.03px;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 0px;
+  position: relative;
+  overflow: visible;
+  display: inline-flex;
+  -webkit-box-align: center;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: TikTokFont, Arial, Tahoma, PingFangSC, sans-serif;
+  cursor: pointer;
+}
+
+.ButtonSwitchDiv-Active {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  left: 0px;
+  top: 0px;
+  background: rgb(11, 224, 155);
+  border-radius: 100px;
+  transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
+}
+
+.ButtonSwitchDiv {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  left: 0px;
+  top: 0px;
+  background: rgba(22, 24, 35, 0.12);
+  border-radius: 100px;
+  transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
+}
+
+.ButtonSwitchIcon-Active {
+  position: absolute;
+  display: flex;
+  -webkit-box-pack: center;
+  justify-content: center;
+  -webkit-box-align: center;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  left: calc(100% - 2px);
+  top: 50%;
+  transform: translate(-100%, -50%);
+  border-radius: 100px;
+  background: rgb(255, 255, 255);
+  box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 2px;
+  transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
+}
+
+.ButtonSwitchIcon {
+  position: absolute;
+  display: flex;
+  -webkit-box-pack: center;
+  justify-content: center;
+  -webkit-box-align: center;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 100px;
+  background: rgb(255, 255, 255);
+  box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 2px;
+  transition: all 0.4s cubic-bezier(0.075, 0.82, 0.165, 1) 0s;
+}
+
+.divSettingItem-TIKTOKPLUS {
+  display: flex;
+  white-space: nowrap;
+  flex-direction: row;
+  width: 100%;
+  -webkit-box-align: center;
+  align-items: center;
+  color: rgb(22, 24, 35);
+}
+
+html {
+  /** CSS DARK THEME PRIMARY COLORS */
+  --color-primary-100: #121212;
+  --color-primary-200: #282828;
+  --color-primary-300: #3f3f3f;
+  --color-primary-400: #575757;
+  --color-primary-500: #717171;
+  --color-primary-600: #8b8b8b;
+  /** CSS DARK THEME SURFACE COLORS */
+  --color-surface-100: #c9c9c9;
+  --color-surface-200: #cfcfcf;
+  --color-surface-300: #d5d5d5;
+  --color-surface-400: #dbdbdb;
+  --color-surface-500: #e1e1e1;
+  --color-surface-600: #e7e7e7;
+  /** CSS DARK THEME MIXED SURFACE COLORS */
+  --color-surface-mixed-100: #b4b4b4;
+  --color-surface-mixed-200: #bcbcbc;
+  --color-surface-mixed-300: #c4c4c4;
+  --color-surface-mixed-400: #cccccc;
+  --color-surface-mixed-500: #d5d5d5;
+  --color-surface-mixed-600: #dddddd;
+
+  --hr-color: #e1e1e1;
+}
+
+html[data-theme="dark"] {
+  /** CSS DARK THEME PRIMARY COLORS */
+  --color-primary-100: #ffffff;
+  --color-primary-200: #dddddd;
+  --color-primary-300: #cfcccc;
+  --color-primary-400: #d6d6d6;
+  --color-primary-500: #c9c9c9;
+  --color-primary-600: #c2c2c2;
+  /** CSS DARK THEME SURFACE COLORS */
+  --color-surface-100: #121212;
+  --color-surface-200: #282828;
+  --color-surface-300: #3f3f3f;
+  --color-surface-400: #575757;
+  --color-surface-500: #717171;
+  --color-surface-600: #8b8b8b;
+  /** CSS DARK THEME MIXED SURFACE COLORS */
+  --color-surface-mixed-100: #252525;
+  --color-surface-mixed-200: #393939;
+  --color-surface-mixed-300: #4f4f4f;
+  --color-surface-mixed-400: #666666;
+  --color-surface-mixed-500: #7d7d7d;
+  --color-surface-mixed-600: #969696;
+
+  --hr-color: #3f3f3f;
+}
+
+span {
+  color: var(--color-primary-100) !important;
+}
+
+h1 {
+  color: var(--color-primary-100) !important;
+}
+
+h2 {
+  color: var(--color-primary-300) !important;
+}
+
+h3 {
+  color: var(--color-primary-100) !important;
+}
+
+h4 {
+  color: var(--color-primary-200) !important;
+}
+
+button {
+  transition: background ease-in-out 200ms;
+}
+
+button:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  text-decoration: none !important;
+  cursor: pointer;
+}
